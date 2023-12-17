@@ -25,3 +25,6 @@ run_log "Test Jaeger UI"
 responds_with \
     "<!doctype html>" \
     "http://localhost:${PORT_UI}"
+
+run_log "Service logs"
+"${DOCKER_COMPOSE[@]}" logs front-envoy
