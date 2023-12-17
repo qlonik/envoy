@@ -5,6 +5,9 @@ services:
     build:
       context: .
       dockerfile: ../shared/envoy/Dockerfile
+      target: envoy-go
+      args:
+        ENVOY_VARIANT: contrib-dev
     depends_on:
       service1:
         condition: service_healthy
