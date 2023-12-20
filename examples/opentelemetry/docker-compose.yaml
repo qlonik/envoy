@@ -4,8 +4,10 @@ services:
     build:
       context: .
       dockerfile: ../shared/envoy/Dockerfile
+      target: envoy-go
       args:
         ENVOY_CONFIG: envoy-front-proxy.yaml
+        ENVOY_VARIANT: contrib-dev
     depends_on:
       opentelemetry:
         condition: service_healthy
