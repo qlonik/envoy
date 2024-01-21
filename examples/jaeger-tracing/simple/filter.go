@@ -1,10 +1,17 @@
 package main
 
 import (
+	"errors"
 	"fmt"
+	"log"
 	"strconv"
+	"strings"
 
 	"github.com/envoyproxy/envoy/contrib/golang/common/go/api"
+	"github.com/openzipkin/zipkin-go"
+	"github.com/openzipkin/zipkin-go/model"
+	"github.com/openzipkin/zipkin-go/propagation/b3"
+	httpreporter "github.com/openzipkin/zipkin-go/reporter/http"
 )
 
 var UpdateUpstreamBody = "upstream response body updated by the simple plugin"
@@ -19,6 +26,74 @@ type filter struct {
 	config    *config
 }
 
+// based on https://github.com/openzipkin/zipkin-go/blob/e84b2cf6d2d915fe0ee57c2dc4d736ec13a2ef6a/propagation/b3/http.go#L53
+func extractParentContextFromHeaders(h api.HeaderMap) (*model.SpanContext, error) {
+	var (
+		traceIDHeader, _      = h.Get(b3.TraceID)
+		spanIDHeader, _       = h.Get(b3.SpanID)
+		parentSpanIDHeader, _ = h.Get(b3.ParentSpanID)
+		sampledHeader, _      = h.Get(b3.Sampled)
+		flagsHeader, _        = h.Get(b3.Flags)
+		singleHeader, _       = h.Get(b3.Context)
+	)
+
+	var (
+		sc   *model.SpanContext
+		sErr error
+		mErr error
+	)
+	if singleHeader != "" {
+		sc, sErr = b3.ParseSingleHeader(singleHeader)
+		if sErr == nil {
+			return sc, nil
+		}
+	}
+
+	sc, mErr = b3.ParseHeaders(
+		traceIDHeader, spanIDHeader, parentSpanIDHeader,
+		sampledHeader, flagsHeader,
+	)
+
+	if mErr != nil && sErr != nil {
+		return nil, sErr
+	}
+
+	return sc, mErr
+}
+
+// based on https://github.com/openzipkin/zipkin-go/blob/e84b2cf6d2d915fe0ee57c2dc4d736ec13a2ef6a/propagation/b3/http.go#L90
+func injectParentcontextIntoHeaders(h *api.RequestHeaderMap, sc model.SpanContext) error {
+	if h == nil {
+		return errors.New("missing target header map")
+	}
+
+	if (model.SpanContext{}) == sc {
+		return b3.ErrEmptyContext
+	}
+
+	if sc.Debug {
+		(*h).Set(b3.Flags, "1")
+	} else if sc.Sampled != nil {
+		// Debug is encoded as X-B3-Flags: 1. Since Debug implies Sampled,
+		// so don't also send "X-B3-Sampled: 1".
+		if *sc.Sampled {
+			(*h).Set(b3.Sampled, "1")
+		} else {
+			(*h).Set(b3.Sampled, "0")
+		}
+	}
+
+	if !sc.TraceID.Empty() && sc.ID > 0 {
+		(*h).Set(b3.TraceID, sc.TraceID.String())
+		(*h).Set(b3.SpanID, sc.ID.String())
+		if sc.ParentID != nil {
+			(*h).Set(b3.ParentSpanID, sc.ParentID.String())
+		}
+	}
+
+	return nil
+}
+
 func (f *filter) sendLocalReplyInternal() api.StatusType {
 	body := fmt.Sprintf("%s, path: %s\r\n", f.config.echoBody, f.path)
 	f.callbacks.SendLocalReply(200, body, nil, 0, "")
@@ -29,6 +104,49 @@ func (f *filter) sendLocalReplyInternal() api.StatusType {
 // Callbacks which are called in request path
 // The endStream is true if the request doesn't have body
 func (f *filter) DecodeHeaders(header api.RequestHeaderMap, endStream bool) api.StatusType {
+	// set up a span reporter
+	reporter := httpreporter.NewReporter(
+		"http://jaeger:9411/api/v2/spans",
+		// forces sending spans right away
+		httpreporter.BatchSize(0),
+	)
+	defer func() { _ = reporter.Close() }()
+
+	// create our local service endpoint
+	endpoint, err := zipkin.NewEndpoint("golang-filter", "")
+	if err != nil {
+		log.Fatalf("unable to create local endpoint: %+v\n", err)
+	}
+
+	// initialize our tracer
+	tracer, err := zipkin.NewTracer(reporter, zipkin.WithLocalEndpoint(endpoint))
+	if err != nil {
+		log.Fatalf("unable to create tracer: %+v\n", err)
+	}
+
+	log.Println("+++")
+	header.Range(func(key, value string) bool {
+		if key == "b3" || strings.HasPrefix(key, "x-b3") {
+			log.Printf("%s: \"%s\"", key, value)
+		}
+		return true
+	})
+	log.Println("---")
+
+	parentContext, err := extractParentContextFromHeaders(header)
+	if err == nil {
+		log.Printf("loaded parent context: %v", *parentContext)
+	} else {
+		log.Printf("error loading parent span context: %v", err)
+	}
+
+	span := tracer.StartSpan("test span", zipkin.Parent(*parentContext))
+	defer span.Finish()
+
+	span.Tag("test-tag", "test-value")
+
+	_ = injectParentcontextIntoHeaders(&header, span.Context())
+
 	f.path, _ = header.Get(":path")
 	api.LogDebugf("get path %s", f.path)
 
