@@ -22,8 +22,11 @@ services:
     build:
       context: ../shared/python
       target: aiohttp-tracing-service3
+      args:
+        ENVOY_VARIANT: contrib-dev
     volumes:
     - ./service1-envoy-jaeger.yaml:/etc/service-envoy.yaml
+    - ./lib/simple.so:/etc/simple.so:ro
     environment:
     - SERVICE_NAME=1
 
@@ -31,8 +34,11 @@ services:
     build:
       context: ../shared/python
       target: aiohttp-tracing-service3
+      args:
+        ENVOY_VARIANT: contrib-dev
     volumes:
     - ./service2-envoy-jaeger.yaml:/etc/service-envoy.yaml
+    - ./lib/simple.so:/etc/simple.so:ro
     environment:
     - SERVICE_NAME=2
 
