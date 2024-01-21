@@ -1,9 +1,14 @@
+ARG ENVOY_IMAGE="${ENVOY_IMAGE:-envoyproxy/envoy}"
+ARG ENVOY_VARIANT="${ENVOY_VARIANT:-dev}"
+
+
 FROM python:3.11.5-slim-bookworm@sha256:edaf703dce209d774af3ff768fc92b1e3b60261e7602126276f9ceb0e3a96874 as python-base
 RUN rm -f /etc/apt/apt.conf.d/docker-clean \
     && echo 'Binary::apt::APT::Keep-Downloaded-Packages "true";' | tee /etc/apt/apt.conf.d/keep-cache
 ARG PYTHON_REQUIREMENTS_FILE=aiohttp/requirements.txt
 ADD "$PYTHON_REQUIREMENTS_FILE" /tmp/requirements.txt
 
+FROM ${ENVOY_IMAGE}:${ENVOY_VARIANT} as selected-envoy
 
 FROM python-base as python-grpc-client
 WORKDIR /client
@@ -41,7 +46,7 @@ ADD tracing/service2.py /code/service.py
 
 
 FROM aiohttp-service as aiohttp-tracing-service3
-COPY --from=envoyproxy/envoy:dev /usr/local/bin/envoy /usr/local/bin/envoy
+COPY --from=selected-envoy /usr/local/bin/envoy /usr/local/bin/envoy
 COPY --chmod=777 tracing/start_service.sh /usr/local/bin/start_service.sh
 ADD tracing/service2.py /code/service.py
 ENTRYPOINT ["/usr/local/bin/start_service.sh"]
