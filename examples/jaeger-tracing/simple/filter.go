@@ -183,6 +183,36 @@ func (f *filter) DecodeTrailers(trailers api.RequestTrailerMap) api.StatusType {
 // Callbacks which are called in response path
 // The endStream is true if the response doesn't have body
 func (f *filter) EncodeHeaders(header api.ResponseHeaderMap, endStream bool) api.StatusType {
+	// set up a span reporter
+	reporter := httpreporter.NewReporter(
+		"http://jaeger:9411/api/v2/spans",
+		// forces sending spans right away
+		httpreporter.BatchSize(0),
+	)
+	defer func() { _ = reporter.Close() }()
+
+	// create our local service endpoint
+	endpoint, err := zipkin.NewEndpoint("golang-filter", "")
+	if err != nil {
+		log.Fatalf("unable to create local endpoint: %+v\n", err)
+	}
+
+	// initialize our tracer
+	tracer, err := zipkin.NewTracer(reporter, zipkin.WithLocalEndpoint(endpoint))
+	if err != nil {
+		log.Fatalf("unable to create tracer: %+v\n", err)
+	}
+
+	// TODO: this does not extract any context. it should be shared from `DecodeHeaders` step
+	parentContext := tracer.Extract(func() (*model.SpanContext, error) {
+		return extractParentContextFromHeaders(header)
+	})
+
+	span := tracer.StartSpan("test span in encode headers", zipkin.Parent(parentContext))
+	defer span.Finish()
+
+	span.Tag("test-tag2", "test-value2")
+
 	if f.path == "/update_upstream_response" {
 		header.Set("Content-Length", strconv.Itoa(len(UpdateUpstreamBody)))
 	}
