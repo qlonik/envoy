@@ -133,14 +133,11 @@ func (f *filter) DecodeHeaders(header api.RequestHeaderMap, endStream bool) api.
 	})
 	log.Println("---")
 
-	parentContext, err := extractParentContextFromHeaders(header)
-	if err == nil {
-		log.Printf("loaded parent context: %v", *parentContext)
-	} else {
-		log.Printf("error loading parent span context: %v", err)
-	}
+	parentContext := tracer.Extract(func() (*model.SpanContext, error) {
+		return extractParentContextFromHeaders(header)
+	})
 
-	span := tracer.StartSpan("test span", zipkin.Parent(*parentContext))
+	span := tracer.StartSpan("test span in decode headers", zipkin.Parent(parentContext))
 	defer span.Finish()
 
 	span.Tag("test-tag", "test-value")
