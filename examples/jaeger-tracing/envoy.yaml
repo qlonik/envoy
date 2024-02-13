@@ -21,9 +21,9 @@ static_resources:
                 "@type": type.googleapis.com/envoy.config.trace.v3.ZipkinConfig
                 collector_cluster: jaeger
                 collector_endpoint: "/api/v2/spans"
-                shared_span_context: false
+                shared_span_context: true
                 collector_endpoint_version: HTTP_JSON
-            spawn_upstream_span: true
+            spawn_upstream_span: false
           codec_type: AUTO
           stat_prefix: ingress_http
           route_config:
