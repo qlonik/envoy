@@ -39,9 +39,12 @@ async def get(request):
     if service_type == "trace" and int(service_name) == 1:
         # call service 2 from service 1
         headers = {}
+        logging.info("+++ service " + str(service_name) + " (" + str(service) + ") sees headers:")
         for header in TRACE_HEADERS_TO_PROPAGATE:
             if header in request.headers:
+                logging.info("\"" + header + "\": " + request.headers[header])
                 headers[header] = request.headers[header]
+        logging.info("---")
         async with aiohttp.ClientSession() as session:
             async with session.get("http://localhost:9000/trace/2", headers=headers) as resp:
                 pass

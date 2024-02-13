@@ -156,21 +156,24 @@ func (f *filter) DecodeHeaders(header api.RequestHeaderMap, endStream bool) api.
 		log.Fatalf("unable to create tracer: %+v\n", err)
 	}
 
-	log.Println("+++")
-	header.Range(func(key, value string) bool {
-		if key == "b3" || strings.HasPrefix(key, "x-b3") {
-			log.Printf("%s: \"%s\"", key, value)
-		}
-		return true
-	})
-	log.Println("---")
-
 	parentContext := tracer.Extract(func() (*model.SpanContext, error) {
 		return extractParentContextFromHeaders(header)
 	})
 
 	span := tracer.StartSpan("test span in decode headers", zipkin.Parent(parentContext))
 	defer span.Finish()
+
+	if f.config.direction == "OUTBOUND" {
+		log.Println("+++ decode headers")
+		header.Range(func(key, value string) bool {
+			if key == "b3" || strings.HasPrefix(key, "x-b3") {
+				log.Printf("%s: \"%s\"", key, value)
+			}
+			return true
+		})
+		log.Printf("span id \"%s\"\n", span.Context().ID.String())
+		log.Println("--- decode headers")
+	}
 
 	span.Tag("test-tag", "test-value")
 	span.Tag("direction", f.config.direction)
@@ -243,6 +246,18 @@ func (f *filter) EncodeHeaders(header api.ResponseHeaderMap, endStream bool) api
 
 	span := tracer.StartSpan("test span in encode headers", zipkin.Parent(parentContext))
 	defer span.Finish()
+
+	if f.config.direction == "OUTBOUND" {
+		log.Println("+++ encode headers")
+		header.Range(func(key, value string) bool {
+			if key == "b3" || strings.HasPrefix(key, "x-b3") {
+				log.Printf("%s: \"%s\"", key, value)
+			}
+			return true
+		})
+		log.Printf("span id \"%s\"\n", span.Context().ID.String())
+		log.Println("--- encode headers")
+	}
 
 	span.Tag("test-tag2", "test-value2")
 	span.Tag("direction", f.config.direction)
