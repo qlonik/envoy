@@ -62,7 +62,39 @@ func extractParentContextFromHeaders(h api.HeaderMap) (*model.SpanContext, error
 }
 
 // based on https://github.com/openzipkin/zipkin-go/blob/e84b2cf6d2d915fe0ee57c2dc4d736ec13a2ef6a/propagation/b3/http.go#L90
-func injectParentcontextIntoHeaders(h *api.RequestHeaderMap, sc model.SpanContext) error {
+func injectParentcontextIntoRequestHeaders(h *api.RequestHeaderMap, sc model.SpanContext) error {
+	if h == nil {
+		return errors.New("missing target header map")
+	}
+
+	if (model.SpanContext{}) == sc {
+		return b3.ErrEmptyContext
+	}
+
+	if sc.Debug {
+		(*h).Set(b3.Flags, "1")
+	} else if sc.Sampled != nil {
+		// Debug is encoded as X-B3-Flags: 1. Since Debug implies Sampled,
+		// so don't also send "X-B3-Sampled: 1".
+		if *sc.Sampled {
+			(*h).Set(b3.Sampled, "1")
+		} else {
+			(*h).Set(b3.Sampled, "0")
+		}
+	}
+
+	if !sc.TraceID.Empty() && sc.ID > 0 {
+		(*h).Set(b3.TraceID, sc.TraceID.String())
+		(*h).Set(b3.SpanID, sc.ID.String())
+		if sc.ParentID != nil {
+			(*h).Set(b3.ParentSpanID, sc.ParentID.String())
+		}
+	}
+
+	return nil
+}
+
+func injectParentcontextIntoResponseHeaders(h *api.ResponseHeaderMap, sc model.SpanContext) error {
 	if h == nil {
 		return errors.New("missing target header map")
 	}
@@ -143,7 +175,7 @@ func (f *filter) DecodeHeaders(header api.RequestHeaderMap, endStream bool) api.
 	span.Tag("test-tag", "test-value")
 	span.Tag("direction", f.config.direction)
 
-	_ = injectParentcontextIntoHeaders(&header, span.Context())
+	_ = injectParentcontextIntoRequestHeaders(&header, span.Context())
 
 	f.path, _ = header.Get(":path")
 	api.LogDebugf("get path %s", f.path)
@@ -214,6 +246,8 @@ func (f *filter) EncodeHeaders(header api.ResponseHeaderMap, endStream bool) api
 
 	span.Tag("test-tag2", "test-value2")
 	span.Tag("direction", f.config.direction)
+
+	_ = injectParentcontextIntoResponseHeaders(&header, span.Context())
 
 	if f.path == "/update_upstream_response" {
 		header.Set("Content-Length", strconv.Itoa(len(UpdateUpstreamBody)))
