@@ -49,4 +49,5 @@ services:
     environment:
     - COLLECTOR_ZIPKIN_HOST_PORT=9411
     ports:
+    - "16685:16685"
     - "${PORT_UI:-10000}:16686"
