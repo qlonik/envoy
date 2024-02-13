@@ -40,17 +40,6 @@ static_resources:
                 decorator:
                   operation: checkAvailability
           http_filters:
-          - name: envoy.filters.http.golang
-            typed_config:
-              "@type": type.googleapis.com/envoy.extensions.filters.http.golang.v3alpha.Config
-              library_id: simple
-              library_path: "/lib/simple.so"
-              plugin_name: simple
-              plugin_config:
-                "@type": type.googleapis.com/xds.type.v3.TypedStruct
-                value:
-                  prefix_localreply_body: "Configured local reply from go"
-                  tracing_url: http://jaeger:9411/api/v2/spans
           - name: envoy.filters.http.router
             typed_config:
               "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
