@@ -141,6 +141,7 @@ func (f *filter) DecodeHeaders(header api.RequestHeaderMap, endStream bool) api.
 	defer span.Finish()
 
 	span.Tag("test-tag", "test-value")
+	span.Tag("direction", f.config.direction)
 
 	_ = injectParentcontextIntoHeaders(&header, span.Context())
 
@@ -212,6 +213,7 @@ func (f *filter) EncodeHeaders(header api.ResponseHeaderMap, endStream bool) api
 	defer span.Finish()
 
 	span.Tag("test-tag2", "test-value2")
+	span.Tag("direction", f.config.direction)
 
 	if f.path == "/update_upstream_response" {
 		header.Set("Content-Length", strconv.Itoa(len(UpdateUpstreamBody)))

@@ -18,7 +18,8 @@ func init() {
 }
 
 type config struct {
-	echoBody string
+	echoBody  string
+	direction string
 	// other fields
 }
 
@@ -33,9 +34,10 @@ func (p *parser) Parse(any *anypb.Any, callbacks api.ConfigCallbackHandler) (int
 		return nil, err
 	}
 
-	v := configStruct.Value
+	v := configStruct.Value.AsMap()
 	conf := &config{}
-	prefix, ok := v.AsMap()["prefix_localreply_body"]
+
+	prefix, ok := v["prefix_localreply_body"]
 	if !ok {
 		return nil, errors.New("missing prefix_localreply_body")
 	}
@@ -44,6 +46,16 @@ func (p *parser) Parse(any *anypb.Any, callbacks api.ConfigCallbackHandler) (int
 	} else {
 		return nil, fmt.Errorf("prefix_localreply_body: expect string while got %T", prefix)
 	}
+
+	direction, ok := v["direction"]
+	if !ok {
+		conf.direction = "<<unset>>"
+	} else if str, ok := direction.(string); ok {
+		conf.direction = str
+	} else {
+		conf.direction = "<<set-to-non-string>>"
+	}
+
 	return conf, nil
 }
 
