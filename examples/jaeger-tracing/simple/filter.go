@@ -21,9 +21,10 @@ var UpdateUpstreamBody = "upstream response body updated by the simple plugin"
 type filter struct {
 	api.PassThroughStreamFilter
 
-	callbacks api.FilterCallbackHandler
-	path      string
-	config    *config
+	callbacks     api.FilterCallbackHandler
+	path          string
+	config        *config
+	parentContext model.SpanContext
 }
 
 // based on https://github.com/openzipkin/zipkin-go/blob/e84b2cf6d2d915fe0ee57c2dc4d736ec13a2ef6a/propagation/b3/http.go#L53
@@ -160,6 +161,8 @@ func (f *filter) DecodeHeaders(header api.RequestHeaderMap, endStream bool) api.
 		return extractParentContextFromHeaders(header)
 	})
 
+	f.parentContext = parentContext
+
 	span := tracer.StartSpan("test span in decode headers", zipkin.Parent(parentContext))
 	defer span.Finish()
 
@@ -240,12 +243,7 @@ func (f *filter) EncodeHeaders(header api.ResponseHeaderMap, endStream bool) api
 		log.Fatalf("unable to create tracer: %+v\n", err)
 	}
 
-	// TODO: this does not extract any context. it should be shared from `DecodeHeaders` step
-	parentContext := tracer.Extract(func() (*model.SpanContext, error) {
-		return extractParentContextFromHeaders(header)
-	})
-
-	span := tracer.StartSpan("test span in encode headers", zipkin.Parent(parentContext))
+	span := tracer.StartSpan("test span in encode headers", zipkin.Parent(f.parentContext))
 	defer span.Finish()
 
 	if f.config.direction == "OUTBOUND" {
