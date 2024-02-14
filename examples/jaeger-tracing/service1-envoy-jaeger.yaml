@@ -18,8 +18,9 @@ static_resources:
                 collector_cluster: jaeger
                 collector_endpoint: "/api/v2/spans"
                 shared_span_context: true
+                split_spans_for_request: true
                 collector_endpoint_version: HTTP_JSON
-            spawn_upstream_span: false
+            spawn_upstream_span: true
           codec_type: AUTO
           stat_prefix: ingress_http
           route_config:
@@ -69,8 +70,9 @@ static_resources:
                 collector_cluster: jaeger
                 collector_endpoint: "/api/v2/spans"
                 shared_span_context: true
+                split_spans_for_request: true
                 collector_endpoint_version: HTTP_JSON
-            spawn_upstream_span: false
+            spawn_upstream_span: true
           codec_type: AUTO
           stat_prefix: egress_http
           route_config:
