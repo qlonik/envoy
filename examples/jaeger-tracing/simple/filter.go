@@ -177,6 +177,7 @@ func (f *filter) DecodeHeaders(header api.RequestHeaderMap, endStream bool) api.
 
 	span.Tag("test-tag", "test-value")
 	span.Tag("direction", f.config.direction)
+	span.Tag("svcName", f.config.svcName)
 
 	_ = injectParentcontextIntoRequestHeaders(&header, span.Context())
 
@@ -261,6 +262,7 @@ func (f *filter) EncodeHeaders(header api.ResponseHeaderMap, endStream bool) api
 
 	span.Tag("test-tag2", "test-value2")
 	span.Tag("direction", f.config.direction)
+	span.Tag("svcName", f.config.svcName)
 
 	_ = injectParentcontextIntoResponseHeaders(&header, span.Context())
 

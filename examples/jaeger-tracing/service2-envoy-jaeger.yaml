@@ -47,6 +47,7 @@ static_resources:
                 value:
                   prefix_localreply_body: "Configured local reply from go"
                   direction: *dir
+                  svcName: service2
           - name: envoy.filters.http.router
             typed_config:
               "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router

@@ -20,6 +20,7 @@ func init() {
 type config struct {
 	echoBody  string
 	direction string
+	svcName   string
 	// other fields
 }
 
@@ -54,6 +55,15 @@ func (p *parser) Parse(any *anypb.Any, callbacks api.ConfigCallbackHandler) (int
 		conf.direction = str
 	} else {
 		conf.direction = "<<set-to-non-string>>"
+	}
+
+	svcName, ok := v["svcName"]
+	if !ok {
+		conf.svcName = "<<unset>>"
+	} else if str, ok := svcName.(string); ok {
+		conf.svcName = str
+	} else {
+		conf.svcName = "<<set-to-non-string>>"
 	}
 
 	return conf, nil
